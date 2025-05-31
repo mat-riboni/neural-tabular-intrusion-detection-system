@@ -1,6 +1,9 @@
-pandas==1.5.3
-numpy==1.24.3
+pandas==2.2.3
+numpy==2.2.6
 scikit-learn==1.6.1
 torch==2.6.0
 tqdm==4.67.1
 rich==13.7.0
+notebook
+ipykernel
+mathplotlib==3.10.3
