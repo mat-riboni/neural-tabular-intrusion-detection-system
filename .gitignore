@@ -1,6 +1,6 @@
 # Custom skipped files
-resources/
-
+resources/dataset
+TODO.txt
 ### Python ###
 # Byte-compiled / optimized / DLL files
 __pycache__/
