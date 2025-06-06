@@ -1,54 +1,159 @@
+# data/preprocessors.py
+
 import pandas as pd
-from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import StandardScaler, LabelEncoder # Aggiungi altro
+import numpy as np
+from sklearn.base import BaseEstimator, TransformerMixin
+from sklearn.preprocessing import StandardScaler, OrdinalEncoder
+from sklearn.impute import SimpleImputer
 import logging
+from typing import List, Tuple, Optional, Self
 
 logger = logging.getLogger(__name__)
 
-def load_data(file_path: str) -> pd.DataFrame:
-    """Load data from CSV file."""
-    logger.info(f"Loading path: {file_path}")
-    try:
-        return pd.read_csv(file_path)
-    except FileNotFoundError:
-        logger.error(f"File not found in {file_path}")
+class TabnetPreprocessor(BaseEstimator, TransformerMixin):
+    def __init__(
+            self,
+            numerical_cols : Optional[List[str]] = None,
+            categorical_cols : Optional[List[str]] = None,
+            ordinal_unknown_value: int = -1
+                ):
+        """
+        Custom preprocessor for tabular data.
+        Requires explicit specification of numerical and categorical columns.
+        Handles categorical NaNs by filling, then encodes categoricals and scales numericals.
+        """
+        self.numerical_cols = numerical_cols if numerical_cols is not None else []
+        self.categorical_cols = categorical_cols if categorical_cols is not None else []
+        self.ordinal_unknown_value = ordinal_unknown_value
+
+        # Transformers to be fitted
+        self.ordinal_encoder_ = None
+        self.numerical_scaler_ = None
 
 
+        # Information learned during fit
+        self.fitted_numerical_cols_ = []
+        self.fitted_categorical_cols_ = []
+        self.final_feature_names_ = []  
+        self.cat_dims_ = [] #needed (maybe, see later) for tabnet, represents number of unique category for each encoded feature
+        #for example -> encoded fature: 'city', unique categories: ['Rome', 'Milan'], cat_dims_[0] = 2
+        self.cat_idxs_ = [] #for embedding in tabnet, represents the columns that contains categorical features 
+        #we need to know indexes (position of the columns) of categorical features.
 
+    def fit(self, X: pd.DataFrame, y:Optional[pd.Series] =None) -> Self:
+        """
+        Fit the preprocessor on the training features X.
+        y is ignored (required for Scikit-learn compatibility).
+        """
+        logger.info("Starting fitting of TabularPreprocessor...")
+        X_fit = X.copy()
 
-def split_data(df: pd.DataFrame, test_size: float = 0.2, val_size: float = 0.1, random_state: int = 42) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
-    """Split dataset in training set, validation set and test set"""
+        # 1. Identify actual columns present and of correct type from those specified
+        self.fitted_numerical_cols_ = [
+            col for col in self.numerical_cols
+            if col in X_fit.columns and pd.api.types.is_numeric_dtype(X_fit[col])
+        ]
+
+        self.fitted_categorical_cols_ = [
+            col for col in self.categorical_cols
+            if col in X_fit.columns
+        ]
     
-    target_column = 'Label'
+        # 2. Categorical Column Preprocessing
+        if self.fitted_categorical_cols_:
+            # Convert to string for safety before encoding,
+            categorical_data_for_fit = X_fit[self.fitted_categorical_cols_].astype(str)
 
-    X = df.drop(columns=[target_column ,'Attack'])
-    y = df[target_column]
-    
-    stratify_data = df[target_column]
+            self.ordinal_encoder_ = OrdinalEncoder(
+                handle_unknown='use_encoded_value',
+                unknown_value=self.ordinal_unknown_value,
+                dtype=int
+            )
+            self.ordinal_encoder_.fit(categorical_data_for_fit)
+            logger.info(f"Fitted OrdinalEncoder for: {self.fitted_categorical_cols_}")
+            self.cat_dims_ = [len(cats) for cats in self.ordinal_encoder_.categories_]
+        else:
+            logger.info("No valid categorical columns found or specified for encoding.")
+            self.cat_dims_ = []
 
-    # First split: training + validation  test
-    X_train_val, X_test, y_train_val, y_test = train_test_split(
-        X, y, test_size=0.2, random_state=random_state, stratify=stratify_data
-    )
-    
-    
-    # if test set is 20%, train_val is l'80%. if val is 10% of the total, then is 10/80 = 12.5% of train_val
-    relative_val_size = 0.125 # val_size / (1 - test_size) 
+        # 3. Numerical Column Preprocessing
+        if self.fitted_numerical_cols_:
+            # This class assumes numerical NaNs/Infs have been handled beforehand.
+            # A warning is issued if they are still present.
+            if X_fit[self.fitted_numerical_cols_].isnull().any().any():
+                logger.warning(f"NaN values found in numerical columns {self.fitted_numerical_cols_} during scaler fit. "
+                               f"It's recommended to handle these prior to preprocessing.")
+            
+            self.numerical_scaler_ = StandardScaler()
+            self.numerical_scaler_.fit(X_fit[self.fitted_numerical_cols_])
+            logger.info(f"Fitted StandardScaler for: {self.fitted_numerical_cols_}")
+        else:
+            logger.info("No valid numerical columns found or specified for scaling.")
 
-    stratify_train_val_data = y_train_val 
+        # 4. Determine final feature names and categorical indices for TabNet
+        # the order will be numerical first, then categorical.
+       
+        self.final_feature_names_ = self.fitted_numerical_cols_ + self.fitted_categorical_cols_
+
+        if self.fitted_categorical_cols_:
+            num_features_count = len(self.fitted_numerical_cols_)
+            self.cat_idxs_ = [
+                i + num_features_count #indxs start from last numerical feature column
+                for i in range(len(self.fitted_categorical_cols_))
+            ]
+
+        logger.info(f"Final feature names determined: {self.final_feature_names_}")
+        logger.info(f"Categorical indices determined (cat_idxs_): {self.cat_idxs_}")
+        logger.info("Fitting of TabularPreprocessor complete.")
+        return self
+
+
+    def transform(self, X: pd.DataFrame) -> pd.DataFrame:
+        """
+        Apply learned transformations to the data X.
+        """
+        if not self.final_feature_names_: # basic check if fit was called
+            logger.error("Preprocessor has not been fitted. Call fit() before transform().")
+            raise RuntimeError("Preprocessor has not been fitted. Call fit() before transform().")
+
+        logger.info("Starting data transformation with TabularPreprocessor...")
+        X_copy = X.copy()
+        X_transformed = pd.DataFrame(index=X_copy.index)
+
+        # Numerical Transformations
+        if self.numerical_scaler_ and self.fitted_numerical_cols_:
+            cols_to_transform = [col for col in self.fitted_numerical_cols_ if col in X_copy.columns]
+            if cols_to_transform:
+                X_transformed[cols_to_transform] = self.numerical_scaler_.transform(X_copy[cols_to_transform])
+
+
+        # Categorical Transformations
+        if self.ordinal_encoder_ and self.fitted_categorical_cols_:
+            cols_to_transform = [col for col in self.fitted_categorical_cols_ if col in X_copy.columns]
+            if cols_to_transform:
+                # Applica lo stesso pre-processing del fit
+                data_to_encode = X_copy[cols_to_transform].astype(str)
+                X_transformed[cols_to_transform] = self.ordinal_encoder_.transform(data_to_encode)
+
+        final_df = X_transformed.reindex(columns=self.final_feature_names_)
+
+        missing_cols_in_input = set(self.final_feature_names_) - set(X.columns)
+        if missing_cols_in_input:
+            logger.warning(f"Input data was missing columns: {missing_cols_in_input}. They will be NaNs in the output.")
+
+        logger.info("Data transformation complete.")
+        return final_df
     
 
-    # Second split: training and validation
-    X_train, X_val, y_train, y_val = train_test_split(
-        X_train_val, y_train_val, test_size=relative_val_size, random_state=random_state, stratify=stratify_train_val_data
-    )
-    
-    logger.info(f"Shape: Train={X_train.shape}, Validation={X_val.shape}, Test={X_test.shape}")
-    
-    # Recombine feature and target for pythorch
-    train_df = pd.concat([X_train, y_train], axis=1)
-    val_df = pd.concat([X_val, y_val], axis=1)
-    test_df = pd.concat([X_test, y_test], axis=1)
-    
-    return train_df, val_df, test_df
+    def get_tabnet_params(self):
+            """
+            Returns the cat_dims and cat_idxs parameters needed for TabNet,
+            which were calculated and stored during the fit method.
+            """
+            if not hasattr(self, 'cat_dims_') or not hasattr(self, 'cat_idxs_'):
+                logger.error("The preprocessor has not been fitted. Call fit() before get_tabnet_params().")
+                raise RuntimeError("The preprocessor has not been fitted. Call fit() before get_tabnet_params().")
 
+            logger.info("Retrieving cat_dims and cat_idxs from the fitted preprocessor.")
+            
+            return self.cat_dims_, self.cat_idxs_
