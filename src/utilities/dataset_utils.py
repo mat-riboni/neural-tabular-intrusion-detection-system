@@ -22,10 +22,9 @@ def drop_nan_and_inf_values(df: pd.DataFrame) -> pd.DataFrame:
     logger.info(f"{removed} rows dropped from DataFrame")
     return df_cleaned
 
-def split_data(df: pd.DataFrame, random_state: int = 42) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+def split_data(df: pd.DataFrame, random_state: int, target_column: str, target_category_column: str) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     """Split dataset in training set, validation set and test set"""
-    target_column = 'Label'
-    X = df.drop(columns=[target_column ,'Attack'])
+    X = df.drop(columns=[target_column ,target_category_column])
     y = df[target_column]
     stratify_data = df[target_column]
     # First split: training + validation  test

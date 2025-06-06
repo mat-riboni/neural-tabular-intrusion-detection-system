@@ -8,3 +8,4 @@ notebook
 ipykernel
 matplotlib==3.10.3
 seaborn
+pytorch-tabnet==4.1.0

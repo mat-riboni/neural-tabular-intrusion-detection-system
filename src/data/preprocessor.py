@@ -1,12 +1,11 @@
 # data/preprocessors.py
 
 import pandas as pd
-import numpy as np
 from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.preprocessing import StandardScaler, OrdinalEncoder
 from sklearn.impute import SimpleImputer
 import logging
-from typing import List, Tuple, Optional, Self
+from typing import List, Optional, Self
 
 logger = logging.getLogger(__name__)
 
@@ -131,7 +130,6 @@ class TabnetPreprocessor(BaseEstimator, TransformerMixin):
         if self.ordinal_encoder_ and self.fitted_categorical_cols_:
             cols_to_transform = [col for col in self.fitted_categorical_cols_ if col in X_copy.columns]
             if cols_to_transform:
-                # Applica lo stesso pre-processing del fit
                 data_to_encode = X_copy[cols_to_transform].astype(str)
                 X_transformed[cols_to_transform] = self.ordinal_encoder_.transform(data_to_encode)
 
