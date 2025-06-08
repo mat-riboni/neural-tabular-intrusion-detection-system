@@ -39,7 +39,7 @@ class TabnetPreprocessor(BaseEstimator, TransformerMixin):
         self.cat_idxs_ = [] #for embedding in tabnet, represents the columns that contains categorical features 
         #we need to know indexes (position of the columns) of categorical features.
 
-    def fit(self, X: pd.DataFrame, y:Optional[pd.Series] =None) -> Self:
+    def fit(self, X: pd.DataFrame, y:Optional[pd.Series]=None, X_val: Optional[pd.DataFrame]=None) -> Self:
         """
         Fit the preprocessor on the training features X.
         y is ignored (required for Scikit-learn compatibility).
@@ -60,15 +60,21 @@ class TabnetPreprocessor(BaseEstimator, TransformerMixin):
     
         # 2. Categorical Column Preprocessing
         if self.fitted_categorical_cols_:
-            # Convert to string for safety before encoding,
-            categorical_data_for_fit = X_fit[self.fitted_categorical_cols_].astype(str)
-
+            if X_val is not None:
+                logger.info("Considering validation data to build a complete categorical vocabulary.")
+                # Sometimes a category is found in X_val but not found in X_train
+                combined_categorical_data = pd.concat(
+                    [X_fit[self.fitted_categorical_cols_], X_val[self.fitted_categorical_cols_]],
+                    axis=0
+                ).astype(str)  #Converted to string for safety
+            else:
+                combined_categorical_data = X_fit[self.fitted_categorical_cols_].astype(str)
+            
             self.ordinal_encoder_ = OrdinalEncoder(
-                handle_unknown='use_encoded_value',
-                unknown_value=self.ordinal_unknown_value,
+                handle_unknown='error',
                 dtype=int
             )
-            self.ordinal_encoder_.fit(categorical_data_for_fit)
+            self.ordinal_encoder_.fit(combined_categorical_data)
             logger.info(f"Fitted OrdinalEncoder for: {self.fitted_categorical_cols_}")
             self.cat_dims_ = [len(cats) for cats in self.ordinal_encoder_.categories_]
         else:

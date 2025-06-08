@@ -5,14 +5,15 @@ import logging
 import os
 import joblib
 
-from utilities.config_manager import ConfigManager
-from utilities.io_handler import load_data
-from utilities.dataset_utils import drop_nan_and_inf_values, split_data
+from src.utilities.config_manager import ConfigManager
+from src.utilities.io_handler import load_data
+from src.utilities.dataset_utils import drop_nan_and_inf_values, split_data
 from src.data.preprocessor import TabnetPreprocessor
 from pytorch_tabnet.tab_model import TabNetClassifier
 
-CONFIG_PATH = './config/config.json'
+CONFIG_PATH = './config/short_config.json'
 
+logging.basicConfig(level=logging.INFO)
 logging.getLogger(__name__)
 
 def main(args):
@@ -41,9 +42,9 @@ def main(args):
     
     try:
         params = all_hyperparams[args.model_size]
-        logging.info(f"Iperparametri caricati per il modello '{args.model_size}'.")
+        logging.info(f"Hyperparameters loaded '{args.model_size}'.")
     except KeyError:
-        logging.error(f"Dimensione del modello '{args.model_size}' non trovata nel file di configurazione.")
+        logging.error(f"Model size '{args.model_size}' not found.")
         return
 
     df = load_data(DATA_PATH)
@@ -61,7 +62,7 @@ def main(args):
     # Pre-processing
     preprocessor = TabnetPreprocessor(numerical_cols=NUMERICAL_COLS, categorical_cols=CATEGORICAL_COLS)
     logging.info("TabnetPreprocessor fitting...")
-    preprocessor.fit(X_train)
+    preprocessor.fit(X_train, X_val=X_val)
     
     logging.info("Data tranformation...")
     X_train_processed = preprocessor.transform(X_train)
