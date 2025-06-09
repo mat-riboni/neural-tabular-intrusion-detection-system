@@ -3,9 +3,9 @@
 import pandas as pd
 from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.preprocessing import StandardScaler, OrdinalEncoder
-from sklearn.impute import SimpleImputer
 import logging
 from typing import List, Optional, Self
+import numpy as np
 
 logger = logging.getLogger(__name__)
 
@@ -29,17 +29,16 @@ class TabnetPreprocessor(BaseEstimator, TransformerMixin):
         self.ordinal_encoder_ = None
         self.numerical_scaler_ = None
 
-
         # Information learned during fit
         self.fitted_numerical_cols_ = []
         self.fitted_categorical_cols_ = []
-        self.final_feature_names_ = []  
+        self.final_feature_names_ = []
         self.cat_dims_ = [] #needed (maybe, see later) for tabnet, represents number of unique category for each encoded feature
         #for example -> encoded fature: 'city', unique categories: ['Rome', 'Milan'], cat_dims_[0] = 2
-        self.cat_idxs_ = [] #for embedding in tabnet, represents the columns that contains categorical features 
+        self.cat_idxs_ = [] #for embedding in tabnet, represents the columns that contains categorical features
         #we need to know indexes (position of the columns) of categorical features.
 
-    def fit(self, X: pd.DataFrame, y:Optional[pd.Series]=None, X_val: Optional[pd.DataFrame]=None) -> Self:
+    def fit(self, X: pd.DataFrame, y:Optional[pd.Series]=None) -> Self:
         """
         Fit the preprocessor on the training features X.
         y is ignored (required for Scikit-learn compatibility).
@@ -48,35 +47,21 @@ class TabnetPreprocessor(BaseEstimator, TransformerMixin):
         X_fit = X.copy()
 
         # 1. Identify actual columns present and of correct type from those specified
-        self.fitted_numerical_cols_ = [
-            col for col in self.numerical_cols
-            if col in X_fit.columns and pd.api.types.is_numeric_dtype(X_fit[col])
-        ]
+        self.fitted_numerical_cols_ = [col for col in self.numerical_cols if col in X_fit.columns and pd.api.types.is_numeric_dtype(X_fit[col])]
+        self.fitted_categorical_cols_ = [col for col in self.categorical_cols if col in X_fit.columns]
 
-        self.fitted_categorical_cols_ = [
-            col for col in self.categorical_cols
-            if col in X_fit.columns
-        ]
-    
         # 2. Categorical Column Preprocessing
         if self.fitted_categorical_cols_:
-            if X_val is not None:
-                logger.info("Considering validation data to build a complete categorical vocabulary.")
-                # Sometimes a category is found in X_val but not found in X_train
-                combined_categorical_data = pd.concat(
-                    [X_fit[self.fitted_categorical_cols_], X_val[self.fitted_categorical_cols_]],
-                    axis=0
-                ).astype(str)  #Converted to string for safety
-            else:
-                combined_categorical_data = X_fit[self.fitted_categorical_cols_].astype(str)
-            
+            learned_categories = [X_fit[col].astype(str).unique() for col in self.fitted_categorical_cols_]
+            self.cat_dims_ = [len(cats) + 1 for cats in learned_categories]
             self.ordinal_encoder_ = OrdinalEncoder(
-                handle_unknown='error',
+                categories=learned_categories,
+                handle_unknown='use_encoded_value',
+                unknown_value=-1,
                 dtype=int
             )
-            self.ordinal_encoder_.fit(combined_categorical_data)
+            self.ordinal_encoder_.fit(X_fit[self.fitted_categorical_cols_].astype(str))
             logger.info(f"Fitted OrdinalEncoder for: {self.fitted_categorical_cols_}")
-            self.cat_dims_ = [len(cats) for cats in self.ordinal_encoder_.categories_]
         else:
             logger.info("No valid categorical columns found or specified for encoding.")
             self.cat_dims_ = []
@@ -86,9 +71,7 @@ class TabnetPreprocessor(BaseEstimator, TransformerMixin):
             # This class assumes numerical NaNs/Infs have been handled beforehand.
             # A warning is issued if they are still present.
             if X_fit[self.fitted_numerical_cols_].isnull().any().any():
-                logger.warning(f"NaN values found in numerical columns {self.fitted_numerical_cols_} during scaler fit. "
-                               f"It's recommended to handle these prior to preprocessing.")
-            
+                logger.warning(f"NaN values found in numerical columns during scaler fit. It's recommended to handle these prior to preprocessing.")
             self.numerical_scaler_ = StandardScaler()
             self.numerical_scaler_.fit(X_fit[self.fitted_numerical_cols_])
             logger.info(f"Fitted StandardScaler for: {self.fitted_numerical_cols_}")
@@ -97,9 +80,7 @@ class TabnetPreprocessor(BaseEstimator, TransformerMixin):
 
         # 4. Determine final feature names and categorical indices for TabNet
         # the order will be numerical first, then categorical.
-       
         self.final_feature_names_ = self.fitted_numerical_cols_ + self.fitted_categorical_cols_
-
         if self.fitted_categorical_cols_:
             num_features_count = len(self.fitted_numerical_cols_)
             self.cat_idxs_ = [
@@ -112,16 +93,15 @@ class TabnetPreprocessor(BaseEstimator, TransformerMixin):
         logger.info("Fitting of TabularPreprocessor complete.")
         return self
 
-
     def transform(self, X: pd.DataFrame) -> pd.DataFrame:
         """
         Apply learned transformations to the data X.
         """
-        if not self.final_feature_names_: # basic check if fit was called
-            logger.error("Preprocessor has not been fitted. Call fit() before transform().")
+        # basic check if fit was called
+        if not self.final_feature_names_:
             raise RuntimeError("Preprocessor has not been fitted. Call fit() before transform().")
 
-        logger.info("Starting data transformation with TabularPreprocessor...")
+        logger.info(f"Starting data transformation...")
         X_copy = X.copy()
         X_transformed = pd.DataFrame(index=X_copy.index)
 
@@ -129,8 +109,9 @@ class TabnetPreprocessor(BaseEstimator, TransformerMixin):
         if self.numerical_scaler_ and self.fitted_numerical_cols_:
             cols_to_transform = [col for col in self.fitted_numerical_cols_ if col in X_copy.columns]
             if cols_to_transform:
-                X_transformed[cols_to_transform] = self.numerical_scaler_.transform(X_copy[cols_to_transform])
-
+                # Fill NaNs in numerical columns before scaling to avoid warnings
+                num_data_to_transform = X_copy[cols_to_transform].fillna(0) # Or another imputation strategy
+                X_transformed[cols_to_transform] = self.numerical_scaler_.transform(num_data_to_transform)
 
         # Categorical Transformations
         if self.ordinal_encoder_ and self.fitted_categorical_cols_:
@@ -141,23 +122,29 @@ class TabnetPreprocessor(BaseEstimator, TransformerMixin):
 
         final_df = X_transformed.reindex(columns=self.final_feature_names_)
 
-        missing_cols_in_input = set(self.final_feature_names_) - set(X.columns)
-        if missing_cols_in_input:
-            logger.warning(f"Input data was missing columns: {missing_cols_in_input}. They will be NaNs in the output.")
+        # Final handling of potential NaNs created by reindex
+        if self.fitted_categorical_cols_:
+            for i, col_name in enumerate(cols_to_transform):
+                    #unknow index is the lenght of categorical categories 
+                    unknown_code = len(self.ordinal_encoder_.categories_[i])
+                    
+                    final_df[col_name].fillna(unknown_code, inplace=True)
+                    # Change -1 in unknown_code index
+                    col_series = X_transformed[col_name].copy()
+                    final_df[col_name].mask(final_df[col_name] == -1, unknown_code, inplace=True)
+
+                    final_df[col_name] = final_df[col_name].astype(int)
+
 
         logger.info("Data transformation complete.")
         return final_df
-    
 
     def get_tabnet_params(self):
-            """
-            Returns the cat_dims and cat_idxs parameters needed for TabNet,
-            which were calculated and stored during the fit method.
-            """
-            if not hasattr(self, 'cat_dims_') or not hasattr(self, 'cat_idxs_'):
-                logger.error("The preprocessor has not been fitted. Call fit() before get_tabnet_params().")
-                raise RuntimeError("The preprocessor has not been fitted. Call fit() before get_tabnet_params().")
-
-            logger.info("Retrieving cat_dims and cat_idxs from the fitted preprocessor.")
-            
-            return self.cat_dims_, self.cat_idxs_
+        """
+        Returns the cat_dims and cat_idxs parameters needed for TabNet,
+        which were calculated and stored during the fit method.
+        """
+        if not hasattr(self, 'cat_dims_') or not hasattr(self, 'cat_idxs_'):
+            raise RuntimeError("The preprocessor has not been fitted. Call fit() before get_tabnet_params().")
+        logger.info("Retrieving cat_dims and cat_idxs from the fitted preprocessor.")
+        return self.cat_dims_, self.cat_idxs_

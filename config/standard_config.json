@@ -41,7 +41,9 @@
       "MAX_IP_PKT_LEN",
       "DST_TO_SRC_AVG_THROUGHPUT",
       "DST_TO_SRC_IAT_MIN",
-      "RETRANSMITTED_IN_BYTES"
+      "RETRANSMITTED_IN_BYTES",
+      "FLOW_START_MILLISECONDS",
+      "FLOW_END_MILLISECONDS"
     ],
     "categorical_cols": [
       "L4_SRC_PORT",
@@ -54,10 +56,13 @@
       "ICMP_TYPE",
       "ICMP_IPV4_TYPE",
       "DNS_QUERY_ID",
-      "DNS_QUERY_TYPE"
+      "DNS_QUERY_TYPE",
+      "IPV4_SRC_ADDR",
+      "IPV4_DST_ADDR",
+      "FTP_COMMAND_RET_CODE"
     ],
     "target_column": "Label",
-    "target_category_column" : "Attack",
+    "target_category_column": "Attack",
     "benign_label": 0
   },
   "training_settings": {
