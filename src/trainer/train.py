@@ -48,28 +48,34 @@ def main(args):
         return
 
     df = load_data(DATA_PATH)
-    df_cleaned = drop_nan_and_inf_values(df) #Dataframe safe cleaning
 
-    train_df, val_df, test_df = split_data(df_cleaned, random_state=RANDOM_STATE, target_column=TARGET_COL, target_category_column=TARGET_CATEGORY_COL)
+    train_df, val_df, test_df = split_data(df, random_state=RANDOM_STATE, target_column=TARGET_COL, target_category_column=TARGET_CATEGORY_COL)
     
+    train_df = drop_nan_and_inf_values(train_df)
+    val_df = drop_nan_and_inf_values(val_df)
+    test_df = drop_nan_and_inf_values(test_df)
+
+
     X_train = train_df.drop(columns=[TARGET_COL])
     y_train = train_df[TARGET_COL]
     X_val = val_df.drop(columns=[TARGET_COL])
     y_val = val_df[TARGET_COL]
     
+   
+
     logging.info(f"Dimensions: Train={X_train.shape}, Validation={X_val.shape}, Test={test_df.shape}")
 
     # Pre-processing
     preprocessor = TabnetPreprocessor(numerical_cols=NUMERICAL_COLS, categorical_cols=CATEGORICAL_COLS)
     logging.info("TabnetPreprocessor fitting...")
-    preprocessor.fit(X_train, X_val=X_val)
+    preprocessor.fit(X_train)
     
     logging.info("Data tranformation...")
     X_train_processed = preprocessor.transform(X_train)
     X_val_processed = preprocessor.transform(X_val)
     cat_dims, cat_idxs = preprocessor.get_tabnet_params()
     
-    # Definizione e Addestramento del Modello
+
     logging.info("TabNet configuration...")
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     logging.info(f"Using device:: {device}")
@@ -87,7 +93,7 @@ def main(args):
     clf.fit(
         X_train=X_train_processed.values, y_train=y_train.values,
         eval_set=[(X_val_processed.values, y_val.values)],
-        eval_name=['validation'], eval_metric=['auc', 'accuracy'],
+        eval_name=['validation'], eval_metric=['auc', 'accuracy', 'balanced_accuracy'],
         max_epochs=params['max_epochs'],
         patience=training_params.get("early_stopping_patience", 20),
         batch_size=params['batch_size'],

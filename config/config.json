@@ -1,96 +1,52 @@
 {
+  "note": "Final configuration after debugging. Removed high-cardinality and data-leaking features like L4 ports, DNS IDs, L7_PROTO, and DNS_TTL_ANSWER to establish a realistic training baseline.",
   "paths": {
     "dataset_path": "./resources/dataset/NF-UNSW-NB15-v3.csv",
     "output_dir": "./src/model"
   },
   "data_columns": {
-    "comment": "Definition of the columns to be used and excluded in the model.",
-
     "numerical_cols": [
-      "IN_BYTES",
-      "OUT_BYTES",
-      "IN_PKTS",
-      "OUT_PKTS",
-      "FLOW_DURATION_MILLISECONDS",
-      "DURATION_IN",
-      "DURATION_OUT",
-      "LONGEST_FLOW_PKT",
-      "SHORTEST_FLOW_PKT",
-      "MIN_IP_PKT_LEN",
-      "MAX_IP_PKT_LEN",
-      "SRC_TO_DST_SECOND_BYTES",
-      "DST_TO_SRC_SECOND_BYTES",
-      "RETRANSMITTED_IN_BYTES",
-      "RETRANSMITTED_IN_PKTS",
-      "RETRANSMITTED_OUT_BYTES",
-      "RETRANSMITTED_OUT_PKTS",
-      "SRC_TO_DST_AVG_THROUGHPUT",
-      "DST_TO_SRC_AVG_THROUGHPUT",
-      "NUM_PKTS_UP_TO_128_BYTES",
       "NUM_PKTS_128_TO_256_BYTES",
+      "RETRANSMITTED_OUT_PKTS",
+      "SRC_TO_DST_IAT_STDDEV",
+      "SRC_TO_DST_SECOND_BYTES",
+      "IN_PKTS",
+      "LONGEST_FLOW_PKT",
       "NUM_PKTS_256_TO_512_BYTES",
+      "DST_TO_SRC_IAT_AVG",
+      "OUT_BYTES",
+      "NUM_PKTS_UP_TO_128_BYTES",
+      "DURATION_OUT",
       "NUM_PKTS_512_TO_1024_BYTES",
-      "NUM_PKTS_1024_TO_1514_BYTES",
-      "TCP_WIN_MAX_IN",
+      "SRC_TO_DST_IAT_AVG",
+      "DURATION_IN",
+      "SHORTEST_FLOW_PKT",
+      "RETRANSMITTED_IN_PKTS",
+      "FLOW_DURATION_MILLISECONDS",
+      "IN_BYTES",
+      "MIN_IP_PKT_LEN",
       "TCP_WIN_MAX_OUT",
       "SRC_TO_DST_IAT_MIN",
-      "SRC_TO_DST_IAT_MAX",
-      "SRC_TO_DST_IAT_AVG",
-      "SRC_TO_DST_IAT_STDDEV",
-      "DST_TO_SRC_IAT_MIN",
+      "RETRANSMITTED_OUT_BYTES",
       "DST_TO_SRC_IAT_MAX",
-      "DST_TO_SRC_IAT_AVG",
-      "DST_TO_SRC_IAT_STDDEV"
+      "DST_TO_SRC_SECOND_BYTES",
+      "NUM_PKTS_1024_TO_1514_BYTES",
+      "SRC_TO_DST_AVG_THROUGHPUT",
+      "DST_TO_SRC_IAT_STDDEV",
+      "OUT_PKTS",
+      "SRC_TO_DST_IAT_MAX",
+      "TCP_WIN_MAX_IN",
+      "MAX_IP_PKT_LEN",
+      "DST_TO_SRC_AVG_THROUGHPUT",
+      "DST_TO_SRC_IAT_MIN",
+      "RETRANSMITTED_IN_BYTES"
     ],
     "categorical_cols": [
       "PROTOCOL",
-      "TCP_FLAGS",
-      "CLIENT_TCP_FLAGS",
-      "SERVER_TCP_FLAGS",
-      "ICMP_TYPE",
-      "ICMP_IPV4_TYPE",
-      "DNS_QUERY_TYPE"
+      "DNS_QUERY_TYPE",
+      "L4_SRC_PORT",
+      "L4_DST_PORT"
     ],
-
-    "removed_features_info": {
-      "reason": "These features were excluded to prevent data leakage and to build a more robust and generalizable model. They have been identified as potential 'leakers' or non-behavioral features.",
-      "features": [
-        {
-          "group": "Dataset Artifacts with Extreme Correlation",
-          "list": [
-            "MAX_TTL",
-            "MIN_TTL"
-          ]
-        },
-        {
-          "group": "High-Cardinality Identifiers (cause memorization, not learning)",
-          "list": [
-            "IPV4_SRC_ADDR",
-            "IPV4_DST_ADDR",
-            "L4_SRC_PORT",
-            "L4_DST_PORT",
-            "DNS_QUERY_ID",
-            "L7_PROTO"
-
-          ]
-        },
-        {
-          "group": "Absolute Timestamps (tie the model to a specific point in time)",
-          "list": [
-            "FLOW_START_MILLISECONDS",
-            "FLOW_END_MILLISECONDS"
-          ]
-        },
-        {
-          "group": "Post-Event Information or Data Collection Artifacts",
-          "list": [
-            "FTP_COMMAND_RET_CODE",
-            "DNS_TTL_ANSWER"
-          ]
-        }
-      ]
-    },
-
     "target_column": "Label",
     "target_category_column": "Attack",
     "benign_label": 0
@@ -102,19 +58,40 @@
   },
   "hyperparameters": {
     "small": {
-      "n_d": 8, "n_a": 8, "n_steps": 3, "gamma": 1.3, "lambda_sparse": 0.001,
-      "cat_emb_dim": 1, "lr": 0.02, "weight_decay": 1e-05,
-      "batch_size": 1024, "max_epochs": 50
+      "n_d": 8,
+      "n_a": 8,
+      "n_steps": 3,
+      "gamma": 1.3,
+      "lambda_sparse": 0.001,
+      "cat_emb_dim": 1,
+      "lr": 0.02,
+      "weight_decay": 1e-05,
+      "batch_size": 1024,
+      "max_epochs": 50
     },
     "medium": {
-      "n_d": 16, "n_a": 16, "n_steps": 4, "gamma": 1.5, "lambda_sparse": 0.0001,
-      "cat_emb_dim": 2, "lr": 0.02, "weight_decay": 1e-05,
-      "batch_size": 1024, "max_epochs": 100
+      "n_d": 16,
+      "n_a": 16,
+      "n_steps": 4,
+      "gamma": 1.5,
+      "lambda_sparse": 0.0001,
+      "cat_emb_dim": 2,
+      "lr": 0.02,
+      "weight_decay": 1e-05,
+      "batch_size": 1024,
+      "max_epochs": 100
     },
     "large": {
-      "n_d": 32, "n_a": 32, "n_steps": 5, "gamma": 1.5, "lambda_sparse": 1e-05,
-      "cat_emb_dim": 4, "lr": 0.01, "weight_decay": 1e-06,
-      "batch_size": 512, "max_epochs": 150
+      "n_d": 32,
+      "n_a": 32,
+      "n_steps": 5,
+      "gamma": 1.5,
+      "lambda_sparse": 1e-05,
+      "cat_emb_dim": 4,
+      "lr": 0.01,
+      "weight_decay": 1e-06,
+      "batch_size": 512,
+      "max_epochs": 150
     }
   }
 }
