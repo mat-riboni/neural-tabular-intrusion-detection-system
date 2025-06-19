@@ -33,7 +33,7 @@ class TabnetPreprocessor(BaseEstimator, TransformerMixin):
         self.fitted_numerical_cols_ = []
         self.fitted_categorical_cols_ = []
         self.final_feature_names_ = []
-        self.cat_dims_ = [] #needed (maybe, see later) for tabnet, represents number of unique category for each encoded feature
+        self.cat_dims_ = [] #needed for tabnet, represents number of unique category for each encoded feature
         #for example -> encoded fature: 'city', unique categories: ['Rome', 'Milan'], cat_dims_[0] = 2
         self.cat_idxs_ = [] #for embedding in tabnet, represents the columns that contains categorical features
         #we need to know indexes (position of the columns) of categorical features.
@@ -110,7 +110,7 @@ class TabnetPreprocessor(BaseEstimator, TransformerMixin):
             cols_to_transform = [col for col in self.fitted_numerical_cols_ if col in X_copy.columns]
             if cols_to_transform:
                 # Fill NaNs in numerical columns before scaling to avoid warnings
-                num_data_to_transform = X_copy[cols_to_transform].fillna(0) # Or another imputation strategy
+                num_data_to_transform = X_copy[cols_to_transform].fillna(0)
                 X_transformed[cols_to_transform] = self.numerical_scaler_.transform(num_data_to_transform)
 
         # Categorical Transformations
@@ -130,7 +130,6 @@ class TabnetPreprocessor(BaseEstimator, TransformerMixin):
                     
                     final_df[col_name].fillna(unknown_code, inplace=True)
                     # Change -1 in unknown_code index
-                    col_series = X_transformed[col_name].copy()
                     final_df[col_name].mask(final_df[col_name] == -1, unknown_code, inplace=True)
 
                     final_df[col_name] = final_df[col_name].astype(int)

@@ -47,6 +47,7 @@ def main(args):
         logging.error(f"Model size '{args.model_size}' not found.")
         return
 
+
     df = load_data(DATA_PATH)
 
     train_df, val_df, test_df = split_data(df, random_state=RANDOM_STATE, target_column=TARGET_COL, target_category_column=TARGET_CATEGORY_COL)
@@ -55,11 +56,14 @@ def main(args):
     val_df = drop_nan_and_inf_values(val_df)
     test_df = drop_nan_and_inf_values(test_df)
 
+    test_df.to_csv('./src/data/test_set.csv', index=False) #Save dataset
 
-    X_train = train_df.drop(columns=[TARGET_COL])
     y_train = train_df[TARGET_COL]
-    X_val = val_df.drop(columns=[TARGET_COL])
+    X_train = train_df.drop(columns=[TARGET_COL]) 
+
+    #TARGET_CATERGORY_COL has already been dropped during data splitting, maybe doing it here is better.
     y_val = val_df[TARGET_COL]
+    X_val = val_df.drop(columns=[TARGET_COL])
     
    
 
@@ -78,7 +82,7 @@ def main(args):
 
     logging.info("TabNet configuration...")
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
-    logging.info(f"Using device:: {device}")
+    logging.info(f"Using device: {device}")
 
     clf = TabNetClassifier(
         n_d=params['n_d'], n_a=params['n_a'], n_steps=params['n_steps'],
@@ -107,6 +111,10 @@ def main(args):
     model_path = os.path.join(OUTPUT_DIR, f'tabnet_model_{args.model_size}')
     clf.save_model(model_path)
     logging.info(f"Model saved in: {model_path}.zip")
+
+    preprocessor_path = os.path.join(OUTPUT_DIR, f'preprocessor_{args.model_size}.pkl')
+    joblib.dump(preprocessor, preprocessor_path)
+    logging.info(f"Preprocessor saved in: {preprocessor_path}")
 
     preprocessor_path = os.path.join(OUTPUT_DIR, f'preprocessor_{args.model_size}.pkl')
     joblib.dump(preprocessor, preprocessor_path)

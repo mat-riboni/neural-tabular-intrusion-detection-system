@@ -43,9 +43,7 @@
     ],
     "categorical_cols": [
       "PROTOCOL",
-      "DNS_QUERY_TYPE",
-      "L4_SRC_PORT",
-      "L4_DST_PORT"
+      "DNS_QUERY_TYPE"
     ],
     "target_column": "Label",
     "target_category_column": "Attack",

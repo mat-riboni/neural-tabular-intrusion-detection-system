@@ -29,14 +29,14 @@ def split_data(df: pd.DataFrame, random_state: int, target_column: str, target_c
     stratify_data = df[target_column]
     # First split: training + validation  test
     X_train_val, X_test, y_train_val, y_test = train_test_split(
-        X, y, test_size=0.2, random_state=random_state, stratify=stratify_data
+        X, y, test_size=0.2, random_state=random_state
     )
     # if test set is 20%, train_val is l'80%. if val is 10% of the total, then is 10/80 = 12.5% of train_val
     relative_val_size = 0.125 # val_size / (1 - test_size) 
     stratify_train_val_data = y_train_val 
     # Second split: training and validation
     X_train, X_val, y_train, y_val = train_test_split(
-        X_train_val, y_train_val, test_size=relative_val_size, random_state=random_state, stratify=stratify_train_val_data
+        X_train_val, y_train_val, test_size=relative_val_size, random_state=random_state
     )
     logger.info(f"Shape: Train={X_train.shape}, Validation={X_val.shape}, Test={X_test.shape}")
     # Recombine feature and target for pythorch
