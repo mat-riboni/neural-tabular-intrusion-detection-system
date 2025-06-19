@@ -56,7 +56,7 @@ def main(args):
     val_df = drop_nan_and_inf_values(val_df)
     test_df = drop_nan_and_inf_values(test_df)
 
-    test_df.to_csv('./src/data/test_set.csv', index=False) #Save dataset
+    test_df.to_csv('./src/data/test_set.csv', index=False) #Save test data
 
     y_train = train_df[TARGET_COL]
     X_train = train_df.drop(columns=[TARGET_COL]) 
