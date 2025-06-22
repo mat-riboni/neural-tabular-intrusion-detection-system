@@ -1,6 +1,7 @@
 # Custom skipped files
 resources/dataset
 src/data/test_set.csv
+src/model
 TODO.txt
 ### Python ###
 # Byte-compiled / optimized / DLL files
