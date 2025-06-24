@@ -22,10 +22,11 @@ def drop_nan_and_inf_values(df: pd.DataFrame) -> pd.DataFrame:
     logger.info(f"{removed} rows dropped from DataFrame")
     return df_cleaned
 
-def split_data(df: pd.DataFrame, random_state: int, target_column: str, target_category_column: str) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+def split_data(df: pd.DataFrame, random_state: int, target_binary_column: str, target_multiclass_column: str, target_column: str) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     """Split dataset in training set, validation set and test set"""
-    X = df.drop(columns=[target_column ,target_category_column])
+
     y = df[target_column]
+    X = df.drop(columns=[target_binary_column ,target_multiclass_column])
     # First split: training + validation  test
     X_train_val, X_test, y_train_val, y_test = train_test_split(
         X, y, test_size=0.2, random_state=random_state, stratify=y
