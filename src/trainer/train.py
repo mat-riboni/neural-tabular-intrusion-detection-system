@@ -10,6 +10,8 @@ from src.utilities.io_handler import load_data
 from src.utilities.dataset_utils import drop_nan_and_inf_values, split_data
 from src.data.preprocessor import TabnetPreprocessor
 from pytorch_tabnet.tab_model import TabNetClassifier
+import torch.nn as nn
+import numpy as np
 from sklearn.preprocessing import LabelEncoder
 
 CONFIG_PATH = './config/short_config.json'
@@ -72,10 +74,9 @@ def main(args):
 
     if args.classification == 'multiclass':
         le = LabelEncoder()
-        y_train_enc = le.fit_transform(y_train)   # fit+transform sul train
-        y_val_enc   = le.transform(y_val)         # solo transform sul val
+        y_train_enc = le.fit_transform(y_train)   
+        y_val_enc   = le.transform(y_val)         
 
-        # salva l'encoder per inference futura
         encoder_path = os.path.join(
             OUTPUT_DIR,
             f'label_encoder_{args.classification}_{args.model_size}.pkl'
@@ -84,13 +85,26 @@ def main(args):
         logger.info(f"LabelEncoder saved in: {encoder_path}")
 
     else:  # binary
-        # nulla da "fit"; basta estrarre l'array
-        y_train_enc = y_train.values
-        y_val_enc   = y_val.values
+        y_train_enc = y_train.values #needed numpy array for tabnet
+        y_val_enc   = y_val.values   #needed numpy array for tabnet
 
     logger.info(f"Dimensions: Train={X_train.shape}, Validation={X_val.shape}, Test={test_df.shape}")
 
-    # Pre-processing
+    device = 'cuda' if torch.cuda.is_available() else 'cpu'
+    logger.info(f"Using device: {device}")
+
+    if args.use_weights:
+        from sklearn.utils.class_weight import compute_class_weight
+        cw = compute_class_weight('balanced', classes=np.unique(y_train_enc), y=y_train_enc)
+        weights_tensor = torch.tensor(cw, dtype=torch.float).to(device)
+        loss_fn = nn.CrossEntropyLoss(weight=weights_tensor)
+        logger.info(f"Using automatically balanced class weights: {cw}")
+    else:
+        loss_fn = nn.CrossEntropyLoss()
+        logger.info("Using unweighted loss (no class weights)")
+
+
+   
     preprocessor = TabnetPreprocessor(numerical_cols=NUMERICAL_COLS, categorical_cols=CATEGORICAL_COLS)
     logger.info("TabnetPreprocessor fitting...")
     preprocessor.fit(X_train)
@@ -102,8 +116,6 @@ def main(args):
     
 
     logger.info("TabNet configuration...")
-    device = 'cuda' if torch.cuda.is_available() else 'cpu'
-    logger.info(f"Using device: {device}")
 
     clf = TabNetClassifier(
         n_d=params['n_d'], n_a=params['n_a'], n_steps=params['n_steps'],
@@ -124,7 +136,8 @@ def main(args):
         max_epochs=params['max_epochs'],
         patience=training_params.get("early_stopping_patience", 20),
         batch_size=params['batch_size'],
-        virtual_batch_size=training_params.get("virtual_batch_size", 128)
+        virtual_batch_size=training_params.get("virtual_batch_size", 128),
+        loss_fn=loss_fn
     )
     logger.info("Training complete.")
     
@@ -155,6 +168,11 @@ if __name__ == '__main__':
         default='binary', 
         choices=['binary', 'multiclass'], 
         help="Classification type: binary or multiclass"
+    )
+    parser.add_argument(
+        '--use-weights',
+        action='store_true',
+        help='If set, uses balanced class weights in the loss function'
     )
 
     args = parser.parse_args()
