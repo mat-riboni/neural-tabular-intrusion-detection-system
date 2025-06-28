@@ -1,0 +1,45 @@
+{
+    "training_settings": {
+    "random_state": 42,
+    "early_stopping_patience": 20,
+    "virtual_batch_size": 128
+  },
+  "hyperparameters": {
+    "small": {
+      "n_d": 8,
+      "n_a": 8,
+      "n_steps": 3,
+      "gamma": 1.3,
+      "lambda_sparse": 0.001,
+      "cat_emb_dim": 1,
+      "lr": 0.02,
+      "weight_decay": 1e-05,
+      "batch_size": 1024,
+      "max_epochs": 50
+    },
+    "medium": {
+      "n_d": 16,
+      "n_a": 16,
+      "n_steps": 4,
+      "gamma": 1.5,
+      "lambda_sparse": 0.0001,
+      "cat_emb_dim": 2,
+      "lr": 0.02,
+      "weight_decay": 1e-05,
+      "batch_size": 1024,
+      "max_epochs": 100
+    },
+    "large": {
+      "n_d": 32,
+      "n_a": 32,
+      "n_steps": 5,
+      "gamma": 1.5,
+      "lambda_sparse": 1e-05,
+      "cat_emb_dim": 4,
+      "lr": 0.01,
+      "weight_decay": 1e-06,
+      "batch_size": 512,
+      "max_epochs": 150
+    }
+  }
+}
