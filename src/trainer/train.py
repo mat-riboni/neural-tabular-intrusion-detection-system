@@ -14,26 +14,32 @@ import torch.nn as nn
 import numpy as np
 from sklearn.preprocessing import LabelEncoder
 
-CONFIG_PATH = './config/short_config.json'
+
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 def main(args):
     """Main function for model training"""
-    
-    try:
-        ConfigManager.load_config(CONFIG_PATH)
-        logger.info(f"Configuration loaded successfully from {CONFIG_PATH}")
-    except (FileNotFoundError, ValueError) as e:
-        logger.error(f"Error during configuration loading: {e}")
-        return
 
-    #Get all necessary configurations
+    DATASET = args.dataset
+
+    if DATASET == 'ton':
+        DATASET_CONFIG_PATH = './config/ton_config.json'
+    else:
+        DATASET_CONFIG_PATH = './config/netflow_config.json'
+    
+    TABNET_CONFIG_PATH = './config/tabnet_config.json'
+
+    try:
+        ConfigManager.load_config(DATASET_CONFIG_PATH)
+        logger.info(f"Dataset configuration loaded successfully from {DATASET_CONFIG_PATH}")
+    except (FileNotFoundError, ValueError) as e:
+        logger.error(f"Error during dataset configuration loading: {e}")
+        return
     paths_config = ConfigManager.get_section("paths")
     data_cols_config = ConfigManager.get_section("data_columns")
-    training_params = ConfigManager.get_section("training_settings")
-    all_hyperparams = ConfigManager.get_section("hyperparameters")
+  
 
     DATA_PATH = paths_config.get("dataset_path")
     OUTPUT_DIR = paths_config.get("output_dir")
@@ -41,12 +47,21 @@ def main(args):
     TARGET_MULTICLASS_COL = data_cols_config.get("target_category_column")
     NUMERICAL_COLS = data_cols_config.get("numerical_cols")
     CATEGORICAL_COLS = data_cols_config.get("categorical_cols")
-    RANDOM_STATE = training_params.get("random_state", 42)
 
     if args.classification == 'multiclass':
         TARGET_COL = TARGET_MULTICLASS_COL
     else:
         TARGET_COL = TARGET_BINARY_COL
+
+    try:
+        ConfigManager.load_config(TABNET_CONFIG_PATH)
+        logger.info(f"TabNet configuration loaded successfully from {TABNET_CONFIG_PATH}")
+    except (FileNotFoundError, ValueError) as e:
+        logger.error(f"Error during TabNet configuration loading: {e}")
+        return
+    training_params = ConfigManager.get_section("training_settings")
+    all_hyperparams = ConfigManager.get_section("hyperparameters")
+    RANDOM_STATE = training_params.get("random_state", 42)
     
     try:
         params = all_hyperparams[args.model_size]
@@ -64,7 +79,7 @@ def main(args):
     val_df = drop_nan_and_inf_values(val_df)
     test_df = drop_nan_and_inf_values(test_df)
 
-    test_df.to_csv('./src/data/test_set.csv', index=False) #Save test data
+    test_df.to_csv(f'./resources/dataset/test_set_{DATASET}.csv', index=False) #Save test data
 
     y_train = train_df[TARGET_COL]
     X_train = train_df.drop(columns=[TARGET_COL]) 
@@ -126,7 +141,7 @@ def main(args):
         mask_type='sparsemax', device_name=device, seed=RANDOM_STATE
     )
 
-    logger.info(f"Starting {args.classification} model training...")
+    logger.info(f"Starting {args.classification} {args.model_size} model training with {DATASET} dataset...")
 
 
     clf.fit(
@@ -144,11 +159,11 @@ def main(args):
     #save the model
     os.makedirs(OUTPUT_DIR, exist_ok=True)
     
-    model_path = os.path.join(OUTPUT_DIR, f'tabnet_{args.classification}_model_{args.model_size}')
+    model_path = os.path.join(OUTPUT_DIR, f'tabnet_{args.classification}_{args.model_size}_{DATASET}')
     clf.save_model(model_path)
     logger.info(f"Model saved in: {model_path}.zip")
 
-    preprocessor_path = os.path.join(OUTPUT_DIR, f'preprocessor_{args.classification}_{args.model_size}.pkl')
+    preprocessor_path = os.path.join(OUTPUT_DIR, f'preprocessor_{args.classification}_{args.model_size}_{DATASET}.pkl')
     joblib.dump(preprocessor, preprocessor_path)
     logger.info(f"Preprocessor saved in: {preprocessor_path}")
 
@@ -168,6 +183,13 @@ if __name__ == '__main__':
         default='binary', 
         choices=['binary', 'multiclass'], 
         help="Classification type: binary or multiclass"
+    )
+    parser.add_argument(
+        '--dataset', 
+        type=str, 
+        default='ton', 
+        choices=['ton', 'netflow'], 
+        help="Dataset used"
     )
     parser.add_argument(
         '--use-weights',
