@@ -147,7 +147,7 @@ def main(args):
     clf.fit(
         X_train=X_train_processed.values, y_train=y_train_enc,
         eval_set=[(X_val_processed.values, y_val_enc)],
-        eval_name=['validation'], eval_metric=['accuracy', 'balanced_accuracy'],
+        eval_name=['validation'], eval_metric=['balanced_accuracy'],
         max_epochs=params['max_epochs'],
         patience=training_params.get("early_stopping_patience", 20),
         batch_size=params['batch_size'],
