@@ -6,11 +6,11 @@
   "data_columns": {
     "numerical_cols": [
         "duration",
-        "src_bytes",
         "dst_bytes",
         "missed_bytes",
         "src_bytes",
         "src_ip_bytes",
+        "src_pkts",
         "dst_packets",
         "dst_ip_bytes",
         "http_request_body_len",
@@ -20,7 +20,11 @@
     "categorical_cols": [
         "proto",
         "conn_state",
-        "http_status_code"
+        "http_status_code",
+        "http_user_agent",
+        "http_method",
+        "src_port",
+        "dst_port"
     ],
     "target_column": "label",
     "target_category_column": "type",
