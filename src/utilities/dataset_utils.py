@@ -50,3 +50,6 @@ def split_data(df: pd.DataFrame, random_state: int, target_binary_column: str, t
 def calc_emb_dim(cardinality, cap=32, floor=4):
     return max(floor, min(cap, int(math.ceil(math.sqrt(cardinality)))))
 
+def port_bucket(p):
+    return 'well_known' if p<=1023 else 'registered' if p<=49151 else 'dynamic'
+

@@ -22,7 +22,9 @@
         "conn_state",
         "http_status_code",
         "http_user_agent",
-        "http_method"
+        "http_method",
+        "src_port_bkt",
+        "dst_port"
     ],
     "target_column": "label",
     "target_category_column": "type",

@@ -7,7 +7,7 @@ import joblib
 
 from src.utilities.config_manager import ConfigManager
 from src.utilities.io_handler import load_data
-from src.utilities.dataset_utils import drop_nan_and_inf_values, split_data, calc_emb_dim
+from src.utilities.dataset_utils import *
 from src.data.preprocessor import TabnetPreprocessor
 from pytorch_tabnet.tab_model import TabNetClassifier
 import torch.nn as nn
@@ -73,12 +73,13 @@ def main(args):
 
     df = load_data(DATA_PATH)
 
+    if DATASET == 'ton':
+        df['src_port_bkt'] = df['src_port'].apply(port_bucket)
+    elif DATASET == 'netflow':
+        df = drop_nan_and_inf_values(df)
+
     train_df, val_df, test_df = split_data(df, random_state=RANDOM_STATE, target_binary_column=TARGET_BINARY_COL, target_multiclass_column=TARGET_MULTICLASS_COL, target_column=TARGET_COL)
     
-    train_df = drop_nan_and_inf_values(train_df)
-    val_df = drop_nan_and_inf_values(val_df)
-    test_df = drop_nan_and_inf_values(test_df)
-
     test_df.to_csv(f'./resources/dataset/test_set_{DATASET}.csv', index=False) #Save test data
 
     y_train = train_df[TARGET_COL]
@@ -151,7 +152,7 @@ def main(args):
         cat_emb_dim=cat_emb_dims, lambda_sparse=params['lambda_sparse'],
         optimizer_fn=torch.optim.Adam,
         optimizer_params=dict(lr=params['lr'], weight_decay=params['weight_decay']),
-        mask_type='sparsemax', device_name=device, seed=RANDOM_STATE
+        mask_type='sparsemax', device_name=device, seed=RANDOM_STATE,
     )
 
     logger.info(f"Starting {args.classification} {args.model_size} model training with {DATASET} dataset...")
