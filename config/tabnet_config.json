@@ -2,7 +2,9 @@
   "training_settings": {
     "random_state": 42,
     "early_stopping_patience": 30,
-    "virtual_batch_size": 128
+    "virtual_batch_size": 128,
+    "pretrain_epochs": 80,
+    "pretrain_patience": 15
   },
   "hyperparameters": {
     "small": {
