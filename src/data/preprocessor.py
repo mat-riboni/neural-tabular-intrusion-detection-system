@@ -124,17 +124,26 @@ class TabnetPreprocessor(BaseEstimator, TransformerMixin):
 
         # Final handling of potential NaNs created by reindex
         if self.fitted_categorical_cols_:
-            for i, col_name in enumerate(cols_to_transform):
-                    #unknow index is the lenght of categorical categories 
-                    unknown_code = len(self.ordinal_encoder_.categories_[i])
-                    
-                    final_df[col_name].fillna(unknown_code, inplace=True)
-                    # Change -1 in unknown_code index
-                    final_df[col_name].mask(final_df[col_name] == -1, unknown_code, inplace=True)
+            num_missing_code = [
+            len(self.ordinal_encoder_.categories_[i])
+            for i, _ in enumerate(self.fitted_categorical_cols_)
+        ]
 
-                    final_df[col_name] = final_df[col_name].astype(int)
-
-
+            for col_name, unknown_code in zip(self.fitted_categorical_cols_, num_missing_code):
+                # riempi NaN e sostituisci -1 in un colpo solo
+                final_df.loc[:, col_name] = (
+                    final_df[col_name]
+                    .fillna(unknown_code)
+                    .where(final_df[col_name] != -1, other=unknown_code)
+                    .astype(np.int32)
+                )
+        
+        final_df[self.fitted_numerical_cols_] = (
+            final_df[self.fitted_numerical_cols_].astype(np.float32)
+        )
+        final_df[self.fitted_categorical_cols_] = (
+            final_df[self.fitted_categorical_cols_].astype(np.int32)
+        )  
         logger.info("Data transformation complete.")
         return final_df
 

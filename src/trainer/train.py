@@ -7,7 +7,7 @@ import joblib
 
 from src.utilities.config_manager import ConfigManager
 from src.utilities.io_handler import load_data
-from src.utilities.dataset_utils import drop_nan_and_inf_values, split_data
+from src.utilities.dataset_utils import drop_nan_and_inf_values, split_data, calc_emb_dim
 from src.data.preprocessor import TabnetPreprocessor
 from pytorch_tabnet.tab_model import TabNetClassifier
 import torch.nn as nn
@@ -111,6 +111,8 @@ def main(args):
     if args.use_weights:
         from sklearn.utils.class_weight import compute_class_weight
         cw = compute_class_weight('balanced', classes=np.unique(y_train_enc), y=y_train_enc)
+        cw = cw / cw.mean() # to avoid huge differences
+        cw = np.clip(cw, 0.001, 10.0) # to keep some weight for most common classes
         weights_tensor = torch.tensor(cw, dtype=torch.float).to(device)
         loss_fn = nn.CrossEntropyLoss(weight=weights_tensor)
         logger.info(f"Using automatically balanced class weights: {cw}")
@@ -128,14 +130,25 @@ def main(args):
     X_train_processed = preprocessor.transform(X_train)
     X_val_processed = preprocessor.transform(X_val)
     cat_dims, cat_idxs = preprocessor.get_tabnet_params()
+
+    #############################
+    #Trying to calculate dynamic embedding
+    # https://developers.googleblog.com/en/introducing-tensorflow-feature-columns/
+
+
+    cat_emb_dims = [calc_emb_dim(c) for c in cat_dims] 
+
+    logger.info(f"cat_dims  : {cat_dims}")
+    logger.info(f"cat_emb_dim (auto): {cat_emb_dims}")
     
+    #############################
 
     logger.info("TabNet configuration...")
 
     clf = TabNetClassifier(
         n_d=params['n_d'], n_a=params['n_a'], n_steps=params['n_steps'],
         gamma=params['gamma'], cat_idxs=cat_idxs, cat_dims=cat_dims,
-        cat_emb_dim=params['cat_emb_dim'], lambda_sparse=params['lambda_sparse'],
+        cat_emb_dim=cat_emb_dims, lambda_sparse=params['lambda_sparse'],
         optimizer_fn=torch.optim.Adam,
         optimizer_params=dict(lr=params['lr'], weight_decay=params['weight_decay']),
         mask_type='sparsemax', device_name=device, seed=RANDOM_STATE

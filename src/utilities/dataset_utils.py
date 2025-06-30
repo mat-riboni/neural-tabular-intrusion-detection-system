@@ -2,6 +2,7 @@ import pandas as pd
 from sklearn.model_selection import train_test_split
 import logging
 import numpy as np
+import math
 
 logger = logging.getLogger(__name__)
 
@@ -44,4 +45,8 @@ def split_data(df: pd.DataFrame, random_state: int, target_binary_column: str, t
     test_df = pd.concat([X_test, y_test], axis=1)
     
     return train_df, val_df, test_df
+
+
+def calc_emb_dim(cardinality, cap=32, floor=4):
+    return max(floor, min(cap, int(math.ceil(math.sqrt(cardinality)))))
 
