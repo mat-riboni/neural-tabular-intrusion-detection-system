@@ -9,7 +9,7 @@ from src.utilities.dataset_utils import *
 from pytorch_tabnet.tab_model import TabNetClassifier
 import torch.nn as nn
 import numpy as np
-from sklearn.preprocessing import LabelEncoder
+from sklearn.preprocessing import LabelEncoder, StandardScaler
 
 
 
@@ -52,6 +52,12 @@ def main():
 
     logger.info(f"Encoding...")
 
+    scaler = StandardScaler()
+    scaler.fit(train_df[NUMERICAL_COLS])
+    for _df in (train_df, valid_df, test_df):
+        _df[NUMERICAL_COLS] = scaler.transform(_df[NUMERICAL_COLS])
+    joblib.dump(scaler, os.path.join(OUTPUT_DIR, "simple_num_scaler.pkl"))
+
 
     categorical_dims, encoders = {}, {}
     for col in CATEGORICAL_COLS:
@@ -85,7 +91,7 @@ def main():
 
     clf = TabNetClassifier(
         n_d=64, n_a=64, n_steps=5,
-        gamma=1.5, n_independent=2, n_shared=2,
+        gamma=1.8, n_independent=2, n_shared=2,
         cat_idxs=cat_idxs,
         cat_dims=cat_dims,
         cat_emb_dim=[min(50, (dim + 1) // 2) for dim in cat_dims], 
@@ -107,8 +113,12 @@ def main():
     y_valid = valid_df[TARGET_COL].values
 
 
-    from pytorch_tabnet.augmentations import ClassificationSMOTE
-    aug = ClassificationSMOTE(p=0.2)
+    from sklearn.utils.class_weight import compute_class_weight
+    cw = compute_class_weight('balanced', classes=np.unique(y_train), y=y_train)
+    cw = cw / cw.mean() # to avoid huge differences
+    weights_tensor = torch.tensor(cw, dtype=torch.float).to(device)
+    loss_fn = nn.CrossEntropyLoss(weight=weights_tensor)
+    logger.info(f"Using automatically balanced class weights: {cw}")
 
     logger.info("Starting training")
 
@@ -119,8 +129,8 @@ def main():
         eval_name=['train', 'valid'],
         max_epochs=100, patience=20,
         batch_size=2048, virtual_batch_size=256,
-        eval_metric= ['balanced_accuracy', 'accuracy'],
-        augmentations=aug
+        loss_fn=loss_fn,
+        eval_metric= ['balanced_accuracy', 'accuracy']
     )
 
     
