@@ -90,16 +90,16 @@ def main():
 
 
     clf = TabNetClassifier(
-        n_d=64, n_a=64, n_steps=5,
+        n_d=32, n_a=32, n_steps=4,
         gamma=1.8, n_independent=2, n_shared=2,
         cat_idxs=cat_idxs,
         cat_dims=cat_dims,
         cat_emb_dim=[min(50, (dim + 1) // 2) for dim in cat_dims], 
-        lambda_sparse=1e-3,
+        lambda_sparse=1e-2,
         momentum=0.02,
         clip_value=1.5,
         optimizer_fn=torch.optim.Adam,
-        optimizer_params=dict(lr=1e-2),  
+        optimizer_params=dict(lr=2e-3),  
         scheduler_params={"gamma": 0.95, "step_size": 20},
         scheduler_fn=torch.optim.lr_scheduler.StepLR,
         epsilon=1e-15, device_name=device
